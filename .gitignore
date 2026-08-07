@@ -216,3 +216,23 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Android / Gradle
+.gradle/
+build/
+**/build/
+local.properties
+gradle/gradle-daemon-jvm.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Generated Android artifacts
+captures/
+*.apk
+*.ap_
+*.aab
+
+# Kotlin
+.kotlin/
