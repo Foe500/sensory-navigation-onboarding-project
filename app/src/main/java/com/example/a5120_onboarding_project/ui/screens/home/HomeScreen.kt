@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,17 +75,18 @@ fun HomeScreen(
 ) {
     val repository = remember { SensoryRepository() }
     val categories = remember { repository.getRefugeCategories() }
-    var selectedCategory by remember { mutableStateOf(categories.first()) }
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
     var destinationText by remember { mutableStateOf("") }
     var submittedDestination by remember { mutableStateOf<String?>(null) }
     var homeMode by remember { mutableStateOf(HomeMode.RefugeBrowse) }
     var validationMessage by remember { mutableStateOf<String?>(null) }
+    var sheetExpanded by remember { mutableStateOf(false) }
 
     val routes = remember(submittedDestination) {
         submittedDestination?.let { repository.getRouteOptions(it) }.orEmpty()
     }
     val refuges = remember(selectedCategory) {
-        repository.getRefugeLocations(selectedCategory)
+        repository.getRefugeLocations(selectedCategory ?: "All")
     }
     var selectedRoute by remember { mutableStateOf<RouteOption?>(null) }
 
@@ -93,11 +96,13 @@ fun HomeScreen(
             submittedDestination = destination
             homeMode = HomeMode.RouteResults
             selectedRoute = null
+            sheetExpanded = false
             validationMessage = null
         } else {
             submittedDestination = null
             homeMode = HomeMode.RefugeBrowse
             selectedRoute = null
+            sheetExpanded = false
             validationMessage = "Try State Library Victoria, Melbourne Central, QV Melbourne, or Carlton Gardens."
         }
     }
@@ -129,29 +134,44 @@ fun HomeScreen(
                 },
                 onSubmit = { submitDestination() },
             )
-            CategoryChips(
+        CategoryChips(
                 categories = categories,
                 selectedCategory = selectedCategory,
                 onCategorySelected = {
-                    selectedCategory = it
+                    selectedCategory = if (selectedCategory == it) null else it
                     homeMode = HomeMode.RefugeBrowse
+                    selectedRoute = null
+                    sheetExpanded = false
                 },
             )
         }
 
-        HomeBottomSheet(
-            homeMode = homeMode,
-            selectedTab = selectedTab,
-            routes = routes,
-            refuges = refuges,
-            selectedRoute = selectedRoute,
-            onRouteSelected = {
-                selectedRoute = it
-                homeMode = HomeMode.RouteSelected
-            },
-            onTabSelected = onTabSelected,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(Color.White)
+                .windowInsetsPadding(WindowInsets.navigationBars),
+        ) {
+            HomeBottomSheet(
+                homeMode = homeMode,
+                expanded = sheetExpanded,
+                routes = routes,
+                refuges = refuges,
+                selectedRoute = selectedRoute,
+                onExpandedChange = { sheetExpanded = it },
+                onRouteSelected = {
+                    selectedRoute = it
+                    homeMode = HomeMode.RouteSelected
+                    sheetExpanded = true
+                },
+            )
+
+            SensoryBottomBar(
+                selectedTab = selectedTab,
+                onTabSelected = onTabSelected,
+            )
+        }
     }
 }
 
@@ -221,7 +241,7 @@ private fun SearchBar(
 @Composable
 private fun CategoryChips(
     categories: List<String>,
-    selectedCategory: String,
+    selectedCategory: String?,
     onCategorySelected: (String) -> Unit,
 ) {
     LazyRow(
@@ -358,21 +378,28 @@ private fun DrawScope.drawMarker(
 @Composable
 private fun HomeBottomSheet(
     homeMode: HomeMode,
-    selectedTab: MainTab,
+    expanded: Boolean,
     routes: List<RouteOption>,
     refuges: List<RefugeLocation>,
     selectedRoute: RouteOption?,
+    onExpandedChange: (Boolean) -> Unit,
     onRouteSelected: (RouteOption) -> Unit,
-    onTabSelected: (MainTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .fillMaxHeight(0.38f)
+            .fillMaxHeight(if (expanded) 0.62f else 0.25f)
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
             .background(Color.White)
-            .windowInsetsPadding(WindowInsets.navigationBars),
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { _, dragAmount ->
+                    when {
+                        dragAmount < -8f -> onExpandedChange(true)
+                        dragAmount > 8f -> onExpandedChange(false)
+                    }
+                }
+            },
     ) {
         Box(
             modifier = Modifier
@@ -380,6 +407,7 @@ private fun HomeBottomSheet(
                 .size(width = 48.dp, height = 4.dp)
                 .clip(RoundedCornerShape(2.dp))
                 .background(Color(0xFFD5DCE6))
+                .clickable { onExpandedChange(!expanded) }
                 .align(Alignment.CenterHorizontally),
         )
 
@@ -440,8 +468,6 @@ private fun HomeBottomSheet(
                 }
             }
         }
-
-        SensoryBottomBar(selectedTab = selectedTab, onTabSelected = onTabSelected)
     }
 }
 
