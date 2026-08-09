@@ -8,12 +8,38 @@ enum class RouteRisk {
 
 data class RouteOption(
     val name: String,
+    val destination: String,
     val minutes: Int,
     val summary: String,
     val risk: RouteRisk,
     val pedestrianRisk: String,
     val constructionRisk: String,
     val eventsRisk: String,
+    val segments: List<RouteSegment>,
+    val routePoints: List<MapPoint>,
+    val explanation: String,
+)
+
+data class RouteDraft(
+    val name: String,
+    val destination: String,
+    val minutes: Int,
+    val summary: String,
+    val segments: List<RouteSegment>,
+    val routePoints: List<MapPoint>,
+)
+
+data class MapPoint(
+    val x: Float,
+    val y: Float,
+)
+
+data class RouteSegment(
+    val name: String,
+    val sensorName: String,
+    val pedestrianCount: Int,
+    val hasConstruction: Boolean,
+    val hasEvent: Boolean,
 )
 
 data class RefugeLocation(
