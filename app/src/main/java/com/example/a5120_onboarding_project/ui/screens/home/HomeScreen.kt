@@ -63,17 +63,22 @@ import com.example.a5120_onboarding_project.data.MainTab
 import com.example.a5120_onboarding_project.data.RefugeLocation
 import com.example.a5120_onboarding_project.data.RouteOption
 import com.example.a5120_onboarding_project.data.RouteRisk
+import com.example.a5120_onboarding_project.data.RouteSegment
+import com.example.a5120_onboarding_project.data.UserPreferences
 import com.example.a5120_onboarding_project.data.repository.SensoryRepository
+import com.example.a5120_onboarding_project.domain.ThresholdChecker
 import com.example.a5120_onboarding_project.ui.components.SensoryBottomBar
 import com.example.a5120_onboarding_project.ui.theme._5120_onboarding_projectTheme
 
 @Composable
 fun HomeScreen(
     selectedTab: MainTab,
+    userPreferences: UserPreferences,
     onTabSelected: (MainTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val repository = remember { SensoryRepository() }
+    val thresholdChecker = remember { ThresholdChecker() }
     val categories = remember { repository.getRefugeCategories() }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var destinationText by remember { mutableStateOf("") }
@@ -159,14 +164,21 @@ fun HomeScreen(
                     expanded = sheetExpanded,
                     routes = routes,
                     refuges = refuges,
-                    selectedRoute = selectedRoute,
-                    onExpandedChange = { sheetExpanded = it },
-                    onRouteSelected = {
-                        selectedRoute = it
+                selectedRoute = selectedRoute,
+                crowdThreshold = userPreferences.crowdThreshold,
+                thresholdChecker = thresholdChecker,
+                onExpandedChange = { sheetExpanded = it },
+                onRouteSelected = {
+                    selectedRoute = it
                         homeMode = HomeMode.RouteSelected
                         sheetExpanded = true
-                    },
-                )
+                },
+                onAlternativeConfirmed = {
+                    selectedRoute = it
+                    homeMode = HomeMode.RouteSelected
+                    sheetExpanded = true
+                },
+            )
             }
 
             SensoryBottomBar(
@@ -384,8 +396,11 @@ private fun HomeBottomSheet(
     routes: List<RouteOption>,
     refuges: List<RefugeLocation>,
     selectedRoute: RouteOption?,
+    crowdThreshold: Int,
+    thresholdChecker: ThresholdChecker,
     onExpandedChange: (Boolean) -> Unit,
     onRouteSelected: (RouteOption) -> Unit,
+    onAlternativeConfirmed: (RouteOption) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -461,7 +476,13 @@ private fun HomeBottomSheet(
                 HomeMode.RouteSelected -> {
                     selectedRoute?.let { route ->
                         item {
-                            RouteExplanationCard(route)
+                            RouteExplanationCard(
+                                route = route,
+                                routes = routes,
+                                crowdThreshold = crowdThreshold,
+                                thresholdChecker = thresholdChecker,
+                                onAlternativeConfirmed = onAlternativeConfirmed,
+                            )
                         }
                     }
                     items(routes) { route ->
@@ -525,13 +546,32 @@ private fun RouteCard(
 }
 
 @Composable
-private fun RouteExplanationCard(route: RouteOption) {
+private fun RouteExplanationCard(
+    route: RouteOption,
+    routes: List<RouteOption>,
+    crowdThreshold: Int,
+    thresholdChecker: ThresholdChecker,
+    onAlternativeConfirmed: (RouteOption) -> Unit,
+) {
+    val exceededSegments = thresholdChecker.exceededSegments(route, crowdThreshold)
+    val alternativeRoute = thresholdChecker.findAlternative(route, routes, crowdThreshold)
+
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = Color(0xFFFFFBF2)),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
+            if (exceededSegments.isNotEmpty()) {
+                ThresholdWarningCard(
+                    exceededSegments = exceededSegments,
+                    crowdThreshold = crowdThreshold,
+                    alternativeRoute = alternativeRoute,
+                    onAlternativeConfirmed = onAlternativeConfirmed,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "Why ${route.risk.name}?",
@@ -556,6 +596,65 @@ private fun RouteExplanationCard(route: RouteOption) {
                     fontSize = 11.sp,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ThresholdWarningCard(
+    exceededSegments: List<RouteSegment>,
+    crowdThreshold: Int,
+    alternativeRoute: RouteOption?,
+    onAlternativeConfirmed: (RouteOption) -> Unit,
+) {
+    val firstSegment = exceededSegments.first()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFFFEDEB))
+            .border(1.dp, Color(0xFFFFC6BF), RoundedCornerShape(8.dp))
+            .padding(12.dp),
+    ) {
+        Text(
+            text = "Crowd threshold exceeded",
+            color = Color(0xFFB83A2E),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(5.dp))
+        Text(
+            text = "${firstSegment.name} has ${firstSegment.pedestrianCount} pedestrians/hour, above your threshold of $crowdThreshold.",
+            color = Color(0xFF7B3B35),
+            fontSize = 11.sp,
+        )
+        if (alternativeRoute != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Suggested alternative: ${alternativeRoute.name} (${alternativeRoute.risk.name}, ${alternativeRoute.minutes} min).",
+                color = Color(0xFF7B3B35),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            TextButton(
+                onClick = { onAlternativeConfirmed(alternativeRoute) },
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Text(
+                    text = "Switch to ${alternativeRoute.name}",
+                    color = Color(0xFF2997FF),
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        } else {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "No lower-stimulation alternative is available for this destination.",
+                color = Color(0xFF7B3B35),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }
@@ -624,6 +723,7 @@ private fun HomeScreenPreview() {
     _5120_onboarding_projectTheme {
         HomeScreen(
             selectedTab = MainTab.Search,
+            userPreferences = UserPreferences(),
             onTabSelected = {},
         )
     }

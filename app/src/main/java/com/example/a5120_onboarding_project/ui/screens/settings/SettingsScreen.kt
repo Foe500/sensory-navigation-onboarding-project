@@ -22,11 +22,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,18 +32,21 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.a5120_onboarding_project.data.MainTab
+import com.example.a5120_onboarding_project.data.UserPreferences
 import com.example.a5120_onboarding_project.ui.components.SensoryBottomBar
 import com.example.a5120_onboarding_project.ui.theme._5120_onboarding_projectTheme
 
 @Composable
 fun SettingsScreen(
     selectedTab: MainTab,
+    userPreferences: UserPreferences,
+    onUserPreferencesChange: (UserPreferences) -> Unit,
     onTabSelected: (MainTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var crowdThreshold by remember { mutableFloatStateOf(0.45f) }
-    var avoidConstruction by remember { mutableStateOf(true) }
-    var showRefuges by remember { mutableStateOf(true) }
+    val crowdTolerance = remember(userPreferences.crowdThreshold) {
+        thresholdToSliderValue(userPreferences.crowdThreshold)
+    }
 
     Column(
         modifier = modifier
@@ -88,13 +87,17 @@ fun SettingsScreen(
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "Routes above this threshold will show an alternative-route warning.",
+                        text = "Current threshold: ${userPreferences.crowdThreshold} pedestrians/hour. Routes above this will show an alternative-route warning.",
                         color = Color(0xFF657180),
                         fontSize = 12.sp,
                     )
                     Slider(
-                        value = crowdThreshold,
-                        onValueChange = { crowdThreshold = it },
+                        value = crowdTolerance,
+                        onValueChange = {
+                            onUserPreferencesChange(
+                                userPreferences.copy(crowdThreshold = sliderValueToThreshold(it)),
+                            )
+                        },
                         steps = 1,
                     )
                     Row(
@@ -112,14 +115,18 @@ fun SettingsScreen(
             PreferenceRow(
                 title = "Avoid construction zones",
                 subtitle = "Increase route risk when construction is nearby.",
-                checked = avoidConstruction,
-                onCheckedChange = { avoidConstruction = it },
+                checked = userPreferences.avoidConstruction,
+                onCheckedChange = {
+                    onUserPreferencesChange(userPreferences.copy(avoidConstruction = it))
+                },
             )
             PreferenceRow(
                 title = "Show sensory refuges",
                 subtitle = "Display libraries, parks and quiet spaces on the map.",
-                checked = showRefuges,
-                onCheckedChange = { showRefuges = it },
+                checked = userPreferences.showRefuges,
+                onCheckedChange = {
+                    onUserPreferencesChange(userPreferences.copy(showRefuges = it))
+                },
             )
 
             Spacer(modifier = Modifier.height(18.dp))
@@ -173,10 +180,31 @@ private fun PreferenceRow(
     }
 }
 
+private fun thresholdToSliderValue(threshold: Int): Float {
+    return when {
+        threshold <= 300 -> 0f
+        threshold >= 800 -> 1f
+        else -> 0.5f
+    }
+}
+
+private fun sliderValueToThreshold(value: Float): Int {
+    return when {
+        value < 0.25f -> 300
+        value < 0.75f -> 550
+        else -> 800
+    }
+}
+
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun SettingsScreenPreview() {
     _5120_onboarding_projectTheme {
-        SettingsScreen(selectedTab = MainTab.Settings, onTabSelected = {})
+        SettingsScreen(
+            selectedTab = MainTab.Settings,
+            userPreferences = UserPreferences(),
+            onUserPreferencesChange = {},
+            onTabSelected = {},
+        )
     }
 }

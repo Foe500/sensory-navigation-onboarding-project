@@ -57,6 +57,12 @@ data class PredictedRiskArea(
     val reason: String,
 )
 
+data class UserPreferences(
+    val crowdThreshold: Int = 800,
+    val avoidConstruction: Boolean = true,
+    val showRefuges: Boolean = true,
+)
+
 enum class MainTab(
     val label: String,
 ) {
