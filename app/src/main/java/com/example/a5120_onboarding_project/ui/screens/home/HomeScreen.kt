@@ -153,19 +153,21 @@ fun HomeScreen(
                 .background(Color.White)
                 .windowInsetsPadding(WindowInsets.navigationBars),
         ) {
-            HomeBottomSheet(
-                homeMode = homeMode,
-                expanded = sheetExpanded,
-                routes = routes,
-                refuges = refuges,
-                selectedRoute = selectedRoute,
-                onExpandedChange = { sheetExpanded = it },
-                onRouteSelected = {
-                    selectedRoute = it
-                    homeMode = HomeMode.RouteSelected
-                    sheetExpanded = true
-                },
-            )
+            if (homeMode != HomeMode.RefugeBrowse || selectedCategory != null) {
+                HomeBottomSheet(
+                    homeMode = homeMode,
+                    expanded = sheetExpanded,
+                    routes = routes,
+                    refuges = refuges,
+                    selectedRoute = selectedRoute,
+                    onExpandedChange = { sheetExpanded = it },
+                    onRouteSelected = {
+                        selectedRoute = it
+                        homeMode = HomeMode.RouteSelected
+                        sheetExpanded = true
+                    },
+                )
+            }
 
             SensoryBottomBar(
                 selectedTab = selectedTab,
@@ -477,7 +479,7 @@ private fun RouteCard(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val accent = if (route.risk == RouteRisk.Low) Color(0xFF18B85D) else Color(0xFFFF7A1A)
+    val accent = route.risk.routeColor()
 
     ElevatedCard(
         modifier = Modifier
@@ -582,17 +584,22 @@ private fun RefugeCard(refuge: RefugeLocation) {
 
 @Composable
 private fun RiskBadge(risk: RouteRisk) {
-    val isLow = risk == RouteRisk.Low
+    val accent = risk.routeColor()
+    val background = when (risk) {
+        RouteRisk.Low -> Color(0xFFD8F8E2)
+        RouteRisk.Medium -> Color(0xFFFFF4C2)
+        RouteRisk.High -> Color(0xFFFFD9D6)
+    }
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isLow) Color(0xFFD8F8E2) else Color(0xFFFFE3C4))
+            .background(background)
             .padding(horizontal = 12.dp, vertical = 5.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = risk.name,
-            color = if (isLow) Color(0xFF14934B) else Color(0xFFB76000),
+            color = accent,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
         )
