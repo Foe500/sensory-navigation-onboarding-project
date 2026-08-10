@@ -2,14 +2,8 @@
 assignment for FIT5120
 # Sensory Navigation Onboarding Project
 
-React + Vite MVP for the FIT5120 onboarding build.
+Android app for the FIT5120 onboarding build.
 
-## Frontend
+## Android
 
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Open the local URL shown in the terminal, usually `http://localhost:5173/`.
+Open the app project in Android Studio.
